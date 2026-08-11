@@ -5,7 +5,6 @@ import {
   Transform2D,
   type CameraKit,
   type CameraKitSession,
-  type Lens,
 } from '@snap/camera-kit';
 
 const API_TOKEN = import.meta.env.VITE_SNAP_CAMERA_KIT_API_TOKEN as string | undefined;
@@ -60,7 +59,6 @@ export default function App() {
   const chunksRef = useRef<Blob[]>([]);
   const recordFrameRef = useRef<number | null>(null);
 
-  const [lens, setLens] = useState<Lens | null>(null);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [mode, setMode] = useState<CaptureMode>('photo');
   const [recording, setRecording] = useState(false);
@@ -103,7 +101,6 @@ export default function App() {
         sessionRef.current = session;
         const loadedLens = await cameraKit.lensRepository.loadLens(LENS_ID, LENS_GROUP_ID);
         if (disposed) return;
-        setLens(loadedLens);
         await session.applyLens(loadedLens);
         await setCamera('environment');
       } catch (reason) {
@@ -206,7 +203,7 @@ export default function App() {
       {error && <div className="camera-error"><p>{error}</p><button onClick={() => setError('')}>Dismiss</button></div>}
 
       <button className={`lens-capture ${mode === 'video' ? 'video-mode' : ''} ${recording ? 'is-recording' : ''}`} onClick={releaseShutter} disabled={!sessionRef.current} aria-label={mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Start recording'}>
-        {recording ? <span className="stop-recording" /> : lens?.iconUrl || lens?.preview?.imageUrl ? <img src={lens.iconUrl ?? lens.preview?.imageUrl} alt="" /> : <span>✦</span>}
+        {recording ? <span className="stop-recording" /> : <span className="shutter-core" />}
       </button>
 
       <footer className="camera-footer">
