@@ -64,6 +64,7 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [capture, setCapture] = useState<Capture>(null);
   const [error, setError] = useState('');
+  const [lensLoading, setLensLoading] = useState(true);
 
   const setCamera = useCallback(async (nextFacing: 'user' | 'environment') => {
     const session = sessionRef.current;
@@ -90,6 +91,7 @@ export default function App() {
     async function start() {
       if (!API_TOKEN || !LENS_GROUP_ID || !LENS_ID) {
         setError('Add your Camera Kit API token, Lens Group ID, and Lens ID to .env, then restart the app.');
+        setLensLoading(false);
         return;
       }
       if (!canvasRef.current) return;
@@ -103,8 +105,10 @@ export default function App() {
         if (disposed) return;
         await session.applyLens(loadedLens);
         await setCamera('environment');
+        if (!disposed) setLensLoading(false);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Unable to open the camera.');
+        if (!disposed) setLensLoading(false);
       }
     }
     void start();
@@ -201,8 +205,9 @@ export default function App() {
 
       {recording && <div className="recording-pill"><span /> REC</div>}
       {error && <div className="camera-error"><p>{error}</p><button onClick={() => setError('')}>Dismiss</button></div>}
+      {lensLoading && <div className="lens-loading" role="status" aria-label="Loading Lens"><span /></div>}
 
-      <button className={`lens-capture ${mode === 'video' ? 'video-mode' : ''} ${recording ? 'is-recording' : ''}`} onClick={releaseShutter} disabled={!sessionRef.current} aria-label={mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Start recording'}>
+      <button className={`lens-capture ${mode === 'video' ? 'video-mode' : ''} ${recording ? 'is-recording' : ''}`} onClick={releaseShutter} disabled={!sessionRef.current || lensLoading} aria-label={mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Start recording'}>
         {recording ? <span className="stop-recording" /> : <span className="shutter-core" />}
       </button>
 
