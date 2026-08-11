@@ -10,6 +10,7 @@ import {
 
 const API_TOKEN = import.meta.env.VITE_SNAP_CAMERA_KIT_API_TOKEN as string | undefined;
 const LENS_GROUP_ID = import.meta.env.VITE_SNAP_LENS_GROUP_ID as string | undefined;
+const LENS_ID = import.meta.env.VITE_SNAP_LENS_ID as string | undefined;
 
 type Capture = {
   url: string;
@@ -58,59 +59,13 @@ export default function App() {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordFrameRef = useRef<number | null>(null);
-  const lensStripRef = useRef<HTMLDivElement>(null);
-  const lensCarouselRef = useRef<HTMLElement>(null);
-  const lensScrollTimerRef = useRef<number | null>(null);
-  const selectedLensRef = useRef('');
-  const lensApplyRequestRef = useRef(0);
-  const lensRailTouchedRef = useRef(false);
-  const startedRef = useRef(false);
 
-  const [lenses, setLenses] = useState<Lens[]>([]);
-  const [selectedLens, setSelectedLens] = useState('');
+  const [lens, setLens] = useState<Lens | null>(null);
   const [facing, setFacing] = useState<'user' | 'environment'>('user');
   const [mode, setMode] = useState<CaptureMode>('photo');
   const [recording, setRecording] = useState(false);
   const [capture, setCapture] = useState<Capture>(null);
   const [error, setError] = useState('');
-
-  const [started, setStarted] = useState(false);
-
-  // iOS Safari requires DeviceMotion/DeviceOrientation permission to be
-  // requested directly inside a user-gesture handler (e.g. a tap), or World
-  // Lenses will never receive real gyroscope/accelerometer data and their
-  // 6-DoF tracking will drift/float even while the phone is held still.
-  // Android grants this automatically, which is why it "just works" there.
-  const requestMotionPermission = async () => {
-    const motionEvent = window.DeviceMotionEvent as unknown as {
-      requestPermission?: () => Promise<'granted' | 'denied'>;
-    };
-    const orientationEvent = window.DeviceOrientationEvent as unknown as {
-      requestPermission?: () => Promise<'granted' | 'denied'>;
-    };
-    try {
-      if (typeof motionEvent?.requestPermission === 'function') {
-        const result = await motionEvent.requestPermission();
-        if (result !== 'granted') return false;
-      }
-      if (typeof orientationEvent?.requestPermission === 'function') {
-        const result = await orientationEvent.requestPermission();
-        if (result !== 'granted') return false;
-      }
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const beginExperience = async () => {
-    const granted = await requestMotionPermission();
-    if (!granted) {
-      setError('Motion & Orientation access is required for World Lenses. Please allow it in the prompt and tap Start again.');
-      return;
-    }
-    setStarted(true);
-  };
 
   const setCamera = useCallback(async (nextFacing: 'user' | 'environment') => {
     const session = sessionRef.current;
@@ -133,13 +88,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!started) return;
-    if (startedRef.current) return;
-    startedRef.current = true;
     let disposed = false;
     async function start() {
-      if (!API_TOKEN || !LENS_GROUP_ID) {
-        setError('Add your Camera Kit API token and Lens Group ID to .env, then restart the app.');
+      if (!API_TOKEN || !LENS_GROUP_ID || !LENS_ID) {
+        setError('Add your Camera Kit API token, Lens Group ID, and Lens ID to .env, then restart the app.');
         return;
       }
       if (!canvasRef.current) return;
@@ -149,14 +101,10 @@ export default function App() {
         kitRef.current = cameraKit;
         const session = await cameraKit.createSession({ liveRenderTarget: canvasRef.current });
         sessionRef.current = session;
-        const result = await cameraKit.lensRepository.loadLensGroups([LENS_GROUP_ID]);
-        if (result.errors.length) throw result.errors[0];
-        if (!result.lenses.length) throw new Error('No Lenses were found in this Lens Group.');
+        const loadedLens = await cameraKit.lensRepository.loadLens(LENS_ID, LENS_GROUP_ID);
         if (disposed) return;
-        setLenses(result.lenses);
-        setSelectedLens(result.lenses[0].id);
-        selectedLensRef.current = result.lenses[0].id;
-        await session.applyLens(result.lenses[0]);
+        setLens(loadedLens);
+        await session.applyLens(loadedLens);
         await setCamera('environment');
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Unable to open the camera.');
@@ -169,40 +117,7 @@ export default function App() {
       void sessionRef.current?.destroy();
       void kitRef.current?.destroy();
     };
-  }, [setCamera, started]);
-
-  const applyLens = async (lens: Lens) => {
-    if (!sessionRef.current || recording) return;
-    const requestId = ++lensApplyRequestRef.current;
-    try {
-      await sessionRef.current.applyLens(lens);
-      if (requestId !== lensApplyRequestRef.current) return;
-      setSelectedLens(lens.id);
-      selectedLensRef.current = lens.id;
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not apply that Lens.');
-    }
-     
-  };
-
-  const selectLensAtCenter = () => {
-    const strip = lensStripRef.current;
-    const carousel = lensCarouselRef.current;
-    if (!strip || !carousel || recording || !lensRailTouchedRef.current) return;
-    const visibleArea = carousel.getBoundingClientRect();
-    const railCenter = visibleArea.left + visibleArea.width / 2;
-    const buttons = [...strip.querySelectorAll<HTMLButtonElement>('[data-lens-id]')];
-    const closest = buttons.reduce<HTMLButtonElement | null>((best, button) => {
-      if (!best) return button;
-      const distance = Math.abs(button.getBoundingClientRect().left + button.offsetWidth / 2 - railCenter);
-      const bestDistance = Math.abs(best.getBoundingClientRect().left + best.offsetWidth / 2 - railCenter);
-      return distance < bestDistance ? button : best;
-    }, null);
-    const lens = lenses.find((item) => item.id === closest?.dataset.lensId);
-    if (lensScrollTimerRef.current) window.clearTimeout(lensScrollTimerRef.current);
-    if (!lens || lens.id === selectedLensRef.current) return;
-    lensScrollTimerRef.current = window.setTimeout(() => void applyLens(lens), 180);
-  };
+  }, [setCamera]);
 
   const takePhoto = () => {
     const canvas = canvasRef.current;
@@ -263,7 +178,6 @@ export default function App() {
   };
 
   const releaseShutter = () => mode === 'photo' ? takePhoto() : toggleRecording();
-  const activeLens = lenses.find((lens) => lens.id === selectedLens);
   const saveCapture = async () => {
     if (!capture) return;
     const file = new File([capture.blob], `snap-lens-${stamp()}.${capture.extension}`, { type: capture.blob.type });
@@ -277,17 +191,6 @@ export default function App() {
     }
     download(capture.url, file.name);
   };
-  if (!started) {
-    return (
-      <main className="camera-app">
-        <div className="start-screen">
-          <p>World Lenses need access to your camera and motion sensors.</p>
-          <button className="start-button" onClick={() => void beginExperience()}>Tap to Start</button>
-          {error && <div className="camera-error"><p>{error}</p><button onClick={() => setError('')}>Dismiss</button></div>}
-        </div>
-      </main>
-    );
-  }
   return (
     <main className="camera-app">
       <canvas ref={canvasRef} className="camera-preview" />
@@ -302,17 +205,8 @@ export default function App() {
       {recording && <div className="recording-pill"><span /> REC</div>}
       {error && <div className="camera-error"><p>{error}</p><button onClick={() => setError('')}>Dismiss</button></div>}
 
-      <section className="lens-carousel" ref={lensCarouselRef} aria-label="Available Lenses" onPointerDown={() => { lensRailTouchedRef.current = true; }} onScroll={selectLensAtCenter}>
-        <div className="lens-track" ref={lensStripRef}>
-          {lenses.map((lens) => (
-            <button key={lens.id} data-lens-id={lens.id} className={`lens-chip ${lens.id === selectedLens ? 'selected' : ''}`} onClick={(event) => { event.currentTarget.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' }); void applyLens(lens); }} aria-label={`Use ${lens.name}`} aria-pressed={lens.id === selectedLens}>
-              {lens.iconUrl || lens.preview?.imageUrl ? <img src={lens.iconUrl ?? lens.preview?.imageUrl} alt="" /> : <span className="lens-fallback">✦</span>}
-            </button>
-          ))}
-        </div>
-      </section>
       <button className={`lens-capture ${mode === 'video' ? 'video-mode' : ''} ${recording ? 'is-recording' : ''}`} onClick={releaseShutter} disabled={!sessionRef.current} aria-label={mode === 'photo' ? 'Take photo' : recording ? 'Stop recording' : 'Start recording'}>
-        {recording ? <span className="stop-recording" /> : activeLens?.iconUrl || activeLens?.preview?.imageUrl ? <img src={activeLens.iconUrl ?? activeLens.preview?.imageUrl} alt="" /> : <span>✦</span>}
+        {recording ? <span className="stop-recording" /> : lens?.iconUrl || lens?.preview?.imageUrl ? <img src={lens.iconUrl ?? lens.preview?.imageUrl} alt="" /> : <span>✦</span>}
       </button>
 
       <footer className="camera-footer">
