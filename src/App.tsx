@@ -104,7 +104,7 @@ export default function App() {
         const loadedLens = await cameraKit.lensRepository.loadLens(LENS_ID, LENS_GROUP_ID);
         if (disposed) return;
         await session.applyLens(loadedLens);
-        await setCamera('environment');
+        await setCamera('user');
         if (!disposed) setLensLoading(false);
       } catch (reason) {
         setError(reason instanceof Error ? reason.message : 'Unable to open the camera.');
