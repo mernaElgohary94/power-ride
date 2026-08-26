@@ -1,3 +1,4 @@
+import './audioCapture';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   bootstrapCameraKit,
@@ -6,6 +7,7 @@ import {
   type CameraKit,
   type CameraKitSession,
 } from '@snap/camera-kit';
+import { getLensAudioStream } from './audioCapture';
 
 const API_TOKEN = import.meta.env.VITE_SNAP_CAMERA_KIT_API_TOKEN as string | undefined;
 const LENS_GROUP_ID = import.meta.env.VITE_SNAP_LENS_GROUP_ID as string | undefined;
@@ -166,12 +168,15 @@ export default function App() {
 
 
    const canvasStream = recordingCanvas.captureStream(30);
-const audioTrack = streamRef.current?.getAudioTracks()[0];
-if (audioTrack) {
-  canvasStream.addTrack(audioTrack);
-} else {
-  setError('No microphone track available; recording without audio.');
-}
+    // Tap the lens's own sound-effect/music output (patched in audioCapture.ts) instead of
+    // the phone microphone — this is audio the lens itself plays, not ambient/mic input.
+    const lensAudioTrack = getLensAudioStream()?.getAudioTracks()[0];
+    if (lensAudioTrack) {
+      canvasStream.addTrack(lensAudioTrack);
+    } else {
+      setError('No lens audio detected yet; recording without audio.');
+    }
+
 
 const recorder = new MediaRecorder(canvasStream, { mimeType });
 
