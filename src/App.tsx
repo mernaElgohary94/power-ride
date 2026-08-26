@@ -166,6 +166,12 @@ export default function App() {
 
 
    const canvasStream = recordingCanvas.captureStream(30);
+const audioTrack = streamRef.current?.getAudioTracks()[0];
+if (audioTrack) {
+  canvasStream.addTrack(audioTrack);
+} else {
+  setError('No microphone track available; recording without audio.');
+}
 
 const recorder = new MediaRecorder(canvasStream, { mimeType });
 
