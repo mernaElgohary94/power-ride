@@ -73,7 +73,7 @@ export default function App() {
     await session.pause();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
+      audio: true,
     });
     streamRef.current = stream;
     const source = createMediaStreamSource(stream, { cameraType: nextFacing });
