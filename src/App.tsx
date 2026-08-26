@@ -144,9 +144,9 @@ export default function App() {
       return;
     }
     const mimeType = [
-      'video/mp4;codecs=avc1,mp4a.40.2',
+     'video/mp4;codecs=avc1.42E01E',
       'video/mp4',
-      'video/webm;codecs=vp8,opus',
+      'video/webm;codecs=vp8',
       'video/webm',
     ].find((type) => MediaRecorder.isTypeSupported(type));
     if (!mimeType) {
@@ -160,16 +160,15 @@ export default function App() {
       recordFrameRef.current = requestAnimationFrame(paintFrame);
     };
     paintFrame();
-    const canvasStream = recordingCanvas.captureStream(30);
 
-    const audioTracks = streamRef.current?.getAudioTracks() ?? [];
+  
 
-    const combinedStream = new MediaStream([
-      ...canvasStream.getVideoTracks(),
-      ...audioTracks,
-    ]);
 
-const recorder = new MediaRecorder(combinedStream, { mimeType });
+
+   const canvasStream = recordingCanvas.captureStream(30);
+
+const recorder = new MediaRecorder(canvasStream, { mimeType });
+
     //const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
