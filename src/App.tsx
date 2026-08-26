@@ -73,7 +73,7 @@ export default function App() {
     await session.pause();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: false,
+      audio: true,
     });
     streamRef.current = stream;
     const source = createMediaStreamSource(stream, { cameraType: nextFacing });
@@ -144,9 +144,9 @@ export default function App() {
       return;
     }
     const mimeType = [
-      'video/mp4;codecs=avc1.42E01E',
+      'video/mp4;codecs=avc1,mp4a.40.2',
       'video/mp4',
-      'video/webm;codecs=vp8',
+      'video/webm;codecs=vp8,opus',
       'video/webm',
     ].find((type) => MediaRecorder.isTypeSupported(type));
     if (!mimeType) {
@@ -160,7 +160,17 @@ export default function App() {
       recordFrameRef.current = requestAnimationFrame(paintFrame);
     };
     paintFrame();
-    const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
+    const canvasStream = recordingCanvas.captureStream(30);
+
+    const audioTracks = streamRef.current?.getAudioTracks() ?? [];
+
+    const combinedStream = new MediaStream([
+      ...canvasStream.getVideoTracks(),
+      ...audioTracks,
+    ]);
+
+const recorder = new MediaRecorder(combinedStream, { mimeType });
+    //const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
     recorder.onstop = () => {
