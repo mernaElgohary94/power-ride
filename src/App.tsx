@@ -83,7 +83,7 @@ export default function App() {
     const transform = nextFacing === 'user' ? Transform2D.MirrorX : Transform2D.Identity;
     source.setTransform(transform);
     await session.setSource(source);
-    source.setTransform(transform);
+    
     await session.play();
     setFacing(nextFacing);
   }, []);
