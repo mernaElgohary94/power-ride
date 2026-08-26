@@ -22,6 +22,7 @@ const originalConnect : any= AudioNode.prototype.connect;
 AudioNode.prototype.connect = function patchedConnect(this: AudioNode, target: any, ...rest: any[]) {
   if (target instanceof AudioDestinationNode) {
     const tap = getOrCreateStreamDestination(target.context);
+    console.log("MERNA");
     originalConnect.call(this, tap);
   }
   return originalConnect.call(this, target, ...rest);
