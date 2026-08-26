@@ -75,6 +75,7 @@ export default function App() {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: true,
+      
     });
     streamRef.current = stream;
     const source = createMediaStreamSource(stream, { cameraType: nextFacing });
@@ -82,7 +83,7 @@ export default function App() {
     const transform = nextFacing === 'user' ? Transform2D.MirrorX : Transform2D.Identity;
     source.setTransform(transform);
     await session.setSource(source);
-    session.unmute();
+     source.setTransform(transform);
     await session.play();
     setFacing(nextFacing);
   }, []);
