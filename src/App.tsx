@@ -74,7 +74,7 @@ export default function App() {
     await session.pause();
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
-      audio: true,
+   //   audio: true,
       
     });
     streamRef.current = stream;
@@ -165,30 +165,30 @@ export default function App() {
 
   
 
-const canvasStream = recordingCanvas.captureStream(30);
+// const canvasStream = recordingCanvas.captureStream(30);
 
-const videoTrack = canvasStream.getVideoTracks()[0];
+// const videoTrack = canvasStream.getVideoTracks()[0];
 
-const audioTrack = streamRef.current?.getAudioTracks()[0];
+// const audioTrack = streamRef.current?.getAudioTracks()[0];
 
-if (!audioTrack) {
-  setError('No audio track available.');
-  return;
-}
+// if (!audioTrack) {
+//   setError('No audio track available.');
+//   return;
+// }
 
-const combinedStream = new MediaStream([
-  videoTrack,
-  audioTrack,
-]);
+// const combinedStream = new MediaStream([
+//   videoTrack,
+//   audioTrack,
+// ]);
 
-const recorder = new MediaRecorder(combinedStream, { mimeType });
+// const recorder = new MediaRecorder(combinedStream, { mimeType });
 
 //    const canvasStream = recordingCanvas.captureStream(30);
 
 // //return new MediaStream([videoTrack, audioTrack]);
 //     const recorder = new MediaRecorder(canvasStream, { mimeType });
 
-    //const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
+    const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
     recorder.onstop = () => {
