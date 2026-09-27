@@ -73,23 +73,10 @@ export default function App() {
     if (!session) return;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     await session.pause();
-    const video = { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } };
-    let stream: MediaStream;
-    try {
-      // Camera Kit passes source audio to a Lens by default, and this track is also
-      // used when the user records a video.
-      stream = await navigator.mediaDevices.getUserMedia({
-        video,
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-      });
-    } catch (reason) {
-      // Keep the camera usable when microphone permission is denied or unavailable.
-      // Recording will then be video-only and communicates that limitation below.
-      stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
-      setError(reason instanceof DOMException && reason.name === 'NotAllowedError'
-        ? 'Microphone access was not granted. Videos will be recorded without microphone audio.'
-        : 'Microphone is unavailable. Videos will be recorded without microphone audio.');
-    }
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false,
+    });
     streamRef.current = stream;
     const source = createMediaStreamSource(stream, { cameraType: nextFacing });
     // Mirror only the front-camera input; Lens UI remains correctly oriented.
@@ -181,9 +168,7 @@ export default function App() {
     };
     paintFrame();
 
-    const canvasStream = recordingCanvas.captureStream(30);
-    const tracks = [...canvasStream.getVideoTracks(), ...streamRef.current?.getAudioTracks() ?? []];
-    const recorder = new MediaRecorder(new MediaStream(tracks), { mimeType });
+    const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
     recorder.onstop = () => {
