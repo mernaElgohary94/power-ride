@@ -66,17 +66,30 @@ export default function App() {
   const [capture, setCapture] = useState<Capture>(null);
   const [error, setError] = useState('');
   const [lensLoading, setLensLoading] = useState(true);
+  const [needsUnmute, setNeedsUnmute] = useState(false);
 
   const setCamera = useCallback(async (nextFacing: 'user' | 'environment') => {
     const session = sessionRef.current;
     if (!session) return;
     streamRef.current?.getTracks().forEach((track) => track.stop());
     await session.pause();
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } },
-   //   audio: true,
-      
-    });
+    const video = { facingMode: { ideal: nextFacing }, width: { ideal: 1280 }, height: { ideal: 720 } };
+    let stream: MediaStream;
+    try {
+      // Camera Kit passes source audio to a Lens by default, and this track is also
+      // used when the user records a video.
+      stream = await navigator.mediaDevices.getUserMedia({
+        video,
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+    } catch (reason) {
+      // Keep the camera usable when microphone permission is denied or unavailable.
+      // Recording will then be video-only and communicates that limitation below.
+      stream = await navigator.mediaDevices.getUserMedia({ video, audio: false });
+      setError(reason instanceof DOMException && reason.name === 'NotAllowedError'
+        ? 'Microphone access was not granted. Videos will be recorded without microphone audio.'
+        : 'Microphone is unavailable. Videos will be recorded without microphone audio.');
+    }
     streamRef.current = stream;
     const source = createMediaStreamSource(stream, { cameraType: nextFacing });
     // Mirror only the front-camera input; Lens UI remains correctly oriented.
@@ -103,6 +116,9 @@ export default function App() {
         kitRef.current = cameraKit;
         const session = await cameraKit.createSession({ liveRenderTarget: canvasRef.current });
         sessionRef.current = session;
+        session.events.addEventListener('error', ({ detail }) => {
+          if (detail.error.name === 'LensVideoPlaybackMutedError') setNeedsUnmute(true);
+        });
         const loadedLens = await cameraKit.lensRepository.loadLens(LENS_ID, LENS_GROUP_ID);
         if (disposed) return;
         await session.applyLens(loadedLens);
@@ -135,13 +151,13 @@ export default function App() {
     }, 'image/jpeg', 0.95);
   };
 
-  const toggleRecording = () => {
+  const toggleRecording = async () => {
     if (recording) {
       recorderRef.current?.stop();
       return;
     }
-    const canvas = canvasRef.current;
-    if (!canvas || typeof MediaRecorder === 'undefined') {
+    const session = sessionRef.current;
+    if (!session || typeof MediaRecorder === 'undefined') {
       setError('Video recording is not supported in this browser.');
       return;
     }
@@ -156,44 +172,24 @@ export default function App() {
       return;
     }
     chunksRef.current = [];
-    const recordingCanvas = portraitCanvas(canvas);
+    // The capture target omits Lens UI intended only for the person using the Lens.
+    await session.play('capture');
+    const recordingCanvas = portraitCanvas(session.output.capture);
     const paintFrame = () => {
-      drawPortrait(canvas, recordingCanvas);
+      drawPortrait(session.output.capture, recordingCanvas);
       recordFrameRef.current = requestAnimationFrame(paintFrame);
     };
     paintFrame();
 
-  
-
-// const canvasStream = recordingCanvas.captureStream(30);
-
-// const videoTrack = canvasStream.getVideoTracks()[0];
-
-// const audioTrack = streamRef.current?.getAudioTracks()[0];
-
-// if (!audioTrack) {
-//   setError('No audio track available.');
-//   return;
-// }
-
-// const combinedStream = new MediaStream([
-//   videoTrack,
-//   audioTrack,
-// ]);
-
-// const recorder = new MediaRecorder(combinedStream, { mimeType });
-
-//    const canvasStream = recordingCanvas.captureStream(30);
-
-// //return new MediaStream([videoTrack, audioTrack]);
-//     const recorder = new MediaRecorder(canvasStream, { mimeType });
-
-    const recorder = new MediaRecorder(recordingCanvas.captureStream(30), { mimeType });
+    const canvasStream = recordingCanvas.captureStream(30);
+    const tracks = [...canvasStream.getVideoTracks(), ...streamRef.current?.getAudioTracks() ?? []];
+    const recorder = new MediaRecorder(new MediaStream(tracks), { mimeType });
     recorderRef.current = recorder;
     recorder.ondataavailable = (event) => event.data.size && chunksRef.current.push(event.data);
     recorder.onstop = () => {
       if (recordFrameRef.current) cancelAnimationFrame(recordFrameRef.current);
       recordFrameRef.current = null;
+      void session.pause('capture');
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType || mimeType });
       const url = URL.createObjectURL(blob);
       setCapture((previous) => {
@@ -206,7 +202,12 @@ export default function App() {
     setRecording(true);
   };
 
-  const releaseShutter = () => mode === 'photo' ? takePhoto() : toggleRecording();
+  const releaseShutter = () => mode === 'photo' ? takePhoto() : void toggleRecording();
+  const unmuteLens = () => {
+    // This must run from a click/tap because browsers block unprompted audio playback.
+    sessionRef.current?.unmute();
+    setNeedsUnmute(false);
+  };
   const saveCapture = async () => {
     if (!capture) return;
     const file = new File([capture.blob], `snap-lens-${stamp()}.${capture.extension}`, { type: capture.blob.type });
@@ -232,6 +233,7 @@ export default function App() {
       </header>
 
       {recording && <div className="recording-pill"><span /> REC</div>}
+      {needsUnmute && <button className="lens-unmute" onClick={unmuteLens}>Tap to enable Lens sound</button>}
       {error && <div className="camera-error"><p>{error}</p><button onClick={() => setError('')}>Dismiss</button></div>}
       {lensLoading && <div className="lens-loading" role="status" aria-label="Loading Lens"><span /></div>}
 

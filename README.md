@@ -10,6 +10,7 @@ Mobile-first React app built with Snap Camera Kit Web. It loads one configured L
 
 ## Notes
 
-- Video is recorded from Camera Kit's output canvas at 30fps, producing WebM. Browser support varies; Chrome on Android is the most reliable target.
+- Video is recorded from Camera Kit's capture canvas at 30fps and combines it with the user's microphone track. Browser support varies; Chrome on Android is the most reliable target. If microphone permission is declined, the app stays usable but records video without microphone audio.
+- Camera Kit does not add Lens sound to its canvas stream. The in-app **Tap to enable Lens sound** control handles browsers' autoplay restriction, but a Lens's own embedded/licensed audio cannot be muxed into a web recording by Camera Kit. Use a separately owned audio track in the web app if that sound must be included in exports.
 - A website can request a file download but cannot directly write into the phone's Gallery. On mobile, use the browser's download/save prompt and choose Photos/Gallery where available.
 - Never commit the `.env` file with your live token.
