@@ -209,10 +209,10 @@ export default function App() {
   const releaseShutter = () => mode === 'photo' ? takePhoto() : toggleRecording();
   const saveCapture = async () => {
     if (!capture) return;
-    const file = new File([capture.blob], `snap-lens-${stamp()}.${capture.extension}`, { type: capture.blob.type });
+    const file = new File([capture.blob], `goXR-lens-${stamp()}.${capture.extension}`, { type: capture.blob.type });
     if (navigator.canShare?.({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: 'Snap Lens capture' });
+        await navigator.share({ files: [file], title: 'goXR Lens capture' });
         return;
       } catch (reason) {
         if (reason instanceof DOMException && reason.name === 'AbortError') return;
