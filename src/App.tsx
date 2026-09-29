@@ -68,6 +68,19 @@ export default function App() {
   const [lensLoading, setLensLoading] = useState(true);
   const [needsUnmute, setNeedsUnmute] = useState(false);
 
+  function isInstagramIOS() {
+  const ua = navigator.userAgent || navigator.vendor;
+
+  return /iPhone|iPad|iPod/i.test(ua) && /Instagram/i.test(ua);
+}
+
+if (isInstagramIOS()) {
+  const currentUrl = window.location.href;
+
+  window.location.href =
+    "instagram://extbrowser/?url=" + encodeURIComponent(currentUrl);
+}
+
   const setCamera = useCallback(async (nextFacing: 'user' | 'environment') => {
     const session = sessionRef.current;
     if (!session) return;
